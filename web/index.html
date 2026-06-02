@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>dblab-agent · run SQL, not your mouth</title>
+<style>
+  :root{
+    --navy:#1e3a8a; --navy-d:#152a63; --amber:#f59e0b; --amber-d:#d97706;
+    --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#f1f5f9; --card:#fff;
+    --tool:#0e7490; --err:#b91c1c; --ok:#15803d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+       color:var(--ink);background:var(--bg);height:100vh;display:flex;flex-direction:column}
+  header{background:linear-gradient(135deg,var(--navy),var(--navy-d));color:#fff;
+         padding:14px 22px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
+  header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
+  header .tag{font-size:12px;color:#cbd5e1}
+  header .spacer{flex:1}
+  header select,header button{font:inherit}
+  select#conn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);
+       border-radius:8px;padding:7px 10px;font-size:13px}
+  select#conn option{color:#000}
+  .ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);
+       border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
+  .ghost:hover{background:rgba(255,255,255,.12)}
+  main{flex:1;overflow-y:auto;padding:24px 0}
+  #chat{max-width:860px;margin:0 auto;padding:0 18px;display:flex;flex-direction:column;gap:16px}
+  .msg{display:flex;gap:12px;align-items:flex-start}
+  .msg .avatar{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;
+       justify-content:center;font-size:14px;font-weight:700;color:#fff}
+  .msg.user .avatar{background:var(--amber)}
+  .msg.bot .avatar{background:var(--navy)}
+  .bubble{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 15px;
+       line-height:1.6;font-size:14.5px;max-width:100%;overflow-x:auto}
+  .msg.user .bubble{background:#fff7ed;border-color:#fed7aa}
+  .bubble p{margin:.4em 0}
+  .bubble code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-size:13px;
+       font-family:"SFMono-Regular",Consolas,monospace}
+  .bubble pre{background:#0f172a;color:#e2e8f0;padding:11px 13px;border-radius:8px;overflow-x:auto;
+       font-size:12.5px;line-height:1.5;font-family:"SFMono-Regular",Consolas,monospace}
+  .bubble pre code{background:none;color:inherit;padding:0}
+  .steps{display:flex;flex-direction:column;gap:6px;margin:2px 0}
+  .step{font-size:12.5px;border:1px solid var(--line);border-left:3px solid var(--tool);
+       background:#f8fafc;border-radius:6px;padding:7px 10px;color:#334155}
+  .step .t{font-weight:600;color:var(--tool)}
+  .step.err{border-left-color:var(--err)} .step.err .t{color:var(--err)}
+  .step pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:8px 10px;margin:6px 0 0;
+       font-size:11.5px;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+  .step summary{cursor:pointer;outline:none}
+  footer{border-top:1px solid var(--line);background:#fff;padding:14px 18px}
+  .composer{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+  textarea#input{flex:1;resize:none;font:inherit;font-size:14.5px;border:1px solid var(--line);
+       border-radius:12px;padding:12px 14px;line-height:1.5;max-height:160px;outline:none}
+  textarea#input:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(30,58,138,.12)}
+  #send{background:var(--amber);color:#fff;border:none;border-radius:12px;padding:0 22px;height:46px;
+       font-size:14.5px;font-weight:600;cursor:pointer}
+  #send:hover{background:var(--amber-d)} #send:disabled{opacity:.5;cursor:default}
+  .hint{max-width:860px;margin:8px auto 0;color:var(--muted);font-size:12px;text-align:center}
+  .examples{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px}
+  .examples button{background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 13px;
+       font-size:12.5px;color:#475569;cursor:pointer}
+  .examples button:hover{border-color:var(--amber);color:var(--amber-d)}
+  .empty{max-width:680px;margin:6vh auto;text-align:center;color:var(--muted)}
+  .empty h2{color:var(--ink);font-size:22px;margin:0 0 6px}
+  .empty .rule{display:inline-block;margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;
+       color:#9a3412;border-radius:10px;padding:10px 16px;font-size:13.5px}
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;
+       justify-content:center;z-index:50}
+  .modal{background:#fff;border-radius:14px;padding:22px;width:380px;max-width:92vw}
+  .modal h3{margin:0 0 14px} .modal label{display:block;font-size:12.5px;color:var(--muted);margin:9px 0 3px}
+  .modal input,.modal select{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+  .modal .row{display:flex;gap:10px} .modal .row>div{flex:1}
+  .modal .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+  .modal .acts button{padding:9px 16px;border-radius:8px;font-size:13.5px;cursor:pointer;border:none}
+  .primary{background:var(--navy);color:#fff} .cancel{background:#e2e8f0;color:#334155}
+</style>
+</head>
+<body>
+<header>
+  <h1>dblab-agent</h1>
+  <span class="tag">run SQL, don't hallucinate · 真跑 SQL，不瞎编</span>
+  <span class="spacer"></span>
+  <label class="tag" for="conn">DB</label>
+  <select id="conn" title="Connection the agent uses by default"></select>
+  <button class="ghost" id="addBtn">+ Connection</button>
+  <a class="ghost" href="/admin" style="text-decoration:none" title="LLM settings">⚙ Admin</a>
+</header>
+
+<main>
+  <div id="chat">
+    <div class="empty" id="empty">
+      <h2>Ask about PostgreSQL, MySQL, or openGauss</h2>
+      <p>The agent answers by running real SQL against live databases — every
+         "supported / not supported" claim is backed by an actual query.</p>
+      <div class="rule">🔒 Iron rule: no claim without a query. Untested = no conclusion.</div>
+      <div class="examples" id="examples"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div id="thumb" style="max-width:860px;margin:0 auto 8px;display:none">
+    <span style="position:relative;display:inline-block">
+      <img id="thumbImg" style="height:54px;border-radius:8px;border:1px solid var(--line)" />
+      <button id="thumbX" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;
+        border:none;background:#0f172a;color:#fff;cursor:pointer;font-size:12px;line-height:1">×</button>
+    </span>
+  </div>
+  <div class="composer">
+    <button id="attach" class="ghost" style="height:46px;width:46px;color:var(--navy);border-color:var(--line);font-size:18px;padding:0" title="Attach a screenshot">📎</button>
+    <input type="file" id="file" accept="image/*" style="display:none" />
+    <textarea id="input" rows="1" placeholder="Ask, or attach a screenshot of a SQL error. (Shift+Enter = newline)"></textarea>
+    <button id="send">Send</button>
+  </div>
+  <div class="hint">Text questions run real SQL; attached images go to the vision model.</div>
+</footer>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3>Add a connection</h3>
+    <label>Label</label><input id="m_label" placeholder="My Postgres" />
+    <div class="row">
+      <div><label>Driver</label>
+        <select id="m_driver"><option value="pg">PostgreSQL / openGauss</option><option value="mysql">MySQL</option></select>
+      </div>
+      <div><label>Database</label><input id="m_db" placeholder="postgres" /></div>
+    </div>
+    <div class="row">
+      <div><label>Host</label><input id="m_host" placeholder="127.0.0.1" /></div>
+      <div><label>Port</label><input id="m_port" placeholder="5432" /></div>
+    </div>
+    <div class="row">
+      <div><label>User</label><input id="m_user" placeholder="postgres" /></div>
+      <div><label>Password</label><input id="m_pass" type="password" /></div>
+    </div>
+    <div class="acts">
+      <button class="cancel" id="m_cancel">Cancel</button>
+      <button class="primary" id="m_save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const chat = $("#chat"), connSel = $("#conn"), input = $("#input"), sendBtn = $("#send");
+let history = [];            // [{role, content}]
+let busy = false;
+let pendingImage = null;     // data URL of an attached screenshot
+
+const EXAMPLES = [
+  "Does MySQL support window functions? Prove it.",
+  "Compare CONCAT behaviour on NULL across PostgreSQL and MySQL.",
+  "What tables are in the demo database?",
+  "Does openGauss support EXPLAIN ANALYZE? Run it.",
+];
+
+function escapeHtml(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+
+// tiny markdown: code fences, inline code, **bold**, paragraphs
+function md(t){
+  t = escapeHtml(t);
+  t = t.replace(/```([\s\S]*?)```/g,(_,c)=>`<pre><code>${c.replace(/^\n/,"")}</code></pre>`);
+  t = t.replace(/`([^`]+)`/g,"<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+  return t.split(/\n{2,}/).map(p=>p.includes("<pre>")?p:`<p>${p.replace(/\n/g,"<br>")}</p>`).join("");
+}
+
+function addMsg(role){
+  $("#empty")?.remove();
+  const wrap = document.createElement("div");
+  wrap.className = "msg " + (role==="user"?"user":"bot");
+  wrap.innerHTML = `<div class="avatar">${role==="user"?"You":"AI"}</div>`;
+  const body = document.createElement("div");
+  body.style.flex="1"; body.style.minWidth="0";
+  wrap.appendChild(body);
+  chat.appendChild(wrap);
+  scroll();
+  return body;
+}
+function scroll(){ const m=$("main"); m.scrollTop=m.scrollHeight; }
+
+function renderStep(container, ev){
+  const d = document.createElement("details");
+  d.className = "step" + (ev.result && ev.result.ok===false ? " err":"");
+  d.open = false;
+  const args = ev.args ? Object.entries(ev.args).map(([k,v])=>`${k}=${typeof v==="string"?v:JSON.stringify(v)}`).join("  ") : "";
+  const head = ev.type==="tool_call"
+    ? `<span class="t">▸ ${ev.name}</span> ${escapeHtml(args).slice(0,300)}`
+    : `<span class="t">⤷ ${ev.name} result</span>`;
+  d.innerHTML = `<summary>${head}</summary>`;
+  if(ev.type==="tool_result"){
+    const pre = document.createElement("pre");
+    pre.textContent = JSON.stringify(ev.result, null, 2);
+    d.appendChild(pre); d.open = false;
+  }
+  container.appendChild(d); scroll();
+  return d;
+}
+
+async function send(){
+  const text = input.value.trim();
+  if((!text && !pendingImage) || busy) return;
+  busy = true; sendBtn.disabled = true;
+  input.value=""; input.style.height="auto";
+
+  // Build the message content: a plain string, or an OpenAI-style content list
+  // when an image is attached (text part + image_url part).
+  const img = pendingImage;
+  const content = img
+    ? [ ...(text ? [{type:"text", text}] : []),
+        {type:"image_url", image_url:{url: img}} ]
+    : text;
+  history.push({role:"user", content});
+  clearThumb();
+
+  const ub = addMsg("user");
+  ub.innerHTML = `<div class="bubble">${img ? `<img src="${img}" style="max-height:160px;border-radius:8px;display:block;margin-bottom:${text?'8px':'0'}">`:""}${text?md(text):""}</div>`;
+
+  const botBody = addMsg("bot");
+  const steps = document.createElement("div"); steps.className="steps"; botBody.appendChild(steps);
+  const bubble = document.createElement("div"); bubble.className="bubble"; bubble.style.display="none";
+  bubble.innerHTML = `<span style="color:#94a3b8">thinking…</span>`; botBody.appendChild(bubble); bubble.style.display="block";
+
+  try{
+    const resp = await fetch("/api/agent",{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({messages:history, connection:connSel.value})
+    });
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf="";
+    while(true){
+      const {value,done} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value,{stream:true});
+      let idx;
+      while((idx=buf.indexOf("\n\n"))>=0){
+        const line = buf.slice(0,idx).trim(); buf = buf.slice(idx+2);
+        if(!line.startsWith("data:")) continue;
+        const ev = JSON.parse(line.slice(5).trim());
+        if(ev.type==="tool_call" || ev.type==="tool_result"){ renderStep(steps, ev); }
+        else if(ev.type==="final"){
+          bubble.innerHTML = md(ev.content||"(empty answer)");
+          history.push({role:"assistant", content:ev.content||""}); scroll();
+        } else if(ev.type==="error"){
+          bubble.innerHTML = `<span style="color:#b91c1c">⚠ ${escapeHtml(ev.error)}</span>`;
+        }
+      }
+    }
+  }catch(e){
+    bubble.innerHTML = `<span style="color:#b91c1c">⚠ ${escapeHtml(String(e))}</span>`;
+  }finally{
+    busy=false; sendBtn.disabled=false; input.focus();
+  }
+}
+
+// ── connections ──
+async function loadConns(){
+  const r = await fetch("/api/connections"); const j = await r.json();
+  connSel.innerHTML="";
+  (j.connections||[]).forEach(c=>{
+    const o=document.createElement("option");
+    o.value=c.id; o.textContent=`${c.label} (${c.id})`;
+    connSel.appendChild(o);
+  });
+}
+
+// ── add-connection modal ──
+$("#addBtn").onclick=()=>$("#modalBg").style.display="flex";
+$("#m_cancel").onclick=()=>$("#modalBg").style.display="none";
+$("#m_save").onclick=async()=>{
+  const body={label:$("#m_label").value,driver:$("#m_driver").value,host:$("#m_host").value,
+    port:$("#m_port").value,user:$("#m_user").value,password:$("#m_pass").value,dbname:$("#m_db").value};
+  const r=await fetch("/api/connections",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok){const e=await r.json();alert(e.error||"failed");return;}
+  $("#modalBg").style.display="none";
+  ["m_label","m_host","m_port","m_user","m_pass","m_db"].forEach(i=>$("#"+i).value="");
+  await loadConns();
+};
+
+// ── image attach ──
+function clearThumb(){ pendingImage=null; $("#file").value=""; $("#thumb").style.display="none"; }
+$("#attach").onclick = () => $("#file").click();
+$("#thumbX").onclick = clearThumb;
+$("#file").onchange = e => {
+  const f = e.target.files[0]; if(!f) return;
+  if(f.size > 6*1024*1024){ alert("Image too large (max ~6 MB)."); return; }
+  const reader = new FileReader();
+  reader.onload = () => { pendingImage = reader.result; $("#thumbImg").src = reader.result; $("#thumb").style.display="block"; };
+  reader.readAsDataURL(f);
+};
+
+// ── examples + input ──
+const ex=$("#examples"); EXAMPLES.forEach(t=>{const b=document.createElement("button");b.textContent=t;
+  b.onclick=()=>{input.value=t;input.focus();};ex.appendChild(b);});
+input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(input.scrollHeight,160)+"px";});
+input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
+sendBtn.onclick=send;
+loadConns();
+</script>
+</body>
+</html>

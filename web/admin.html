@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>dblab-agent · admin</title>
+<style>
+  :root{--navy:#1e3a8a;--navy-d:#152a63;--amber:#f59e0b;--amber-d:#d97706;
+    --ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--bg:#f1f5f9;--ok:#15803d;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--ink);background:var(--bg);min-height:100vh}
+  header{background:linear-gradient(135deg,var(--navy),var(--navy-d));color:#fff;
+    padding:14px 22px;display:flex;align-items:center;gap:14px}
+  header h1{font-size:18px;margin:0;font-weight:700}
+  header .tag{font-size:12px;color:#cbd5e1}
+  header .spacer{flex:1}
+  header a{color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.35);
+    border-radius:8px;padding:7px 12px;font-size:13px}
+  header a:hover{background:rgba(255,255,255,.12)}
+  main{max-width:720px;margin:28px auto;padding:0 18px;display:flex;flex-direction:column;gap:20px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:22px;
+    box-shadow:0 1px 3px rgba(15,23,42,.05)}
+  .card h2{margin:0 0 4px;font-size:17px;display:flex;align-items:center;gap:9px}
+  .card .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
+  .card .badge{font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px}
+  .badge.on{background:#dcfce7;color:var(--ok)} .badge.off{background:#fee2e2;color:#b91c1c}
+  label{display:block;font-size:12.5px;color:var(--muted);margin:12px 0 4px;font-weight:500}
+  input{width:100%;font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line);
+    border-radius:9px;outline:none}
+  input:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(30,58,138,.1)}
+  .hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+  .bar{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 40%);
+    padding:18px;display:flex;gap:12px;align-items:center;justify-content:flex-end}
+  .bar .token{flex:1;max-width:240px}
+  button{background:var(--amber);color:#fff;border:none;border-radius:10px;padding:11px 24px;
+    font-size:14.5px;font-weight:600;cursor:pointer}
+  button:hover{background:var(--amber-d)} button:disabled{opacity:.5}
+  #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);
+    color:#fff;padding:10px 18px;border-radius:10px;font-size:13.5px;opacity:0;transition:.25s;pointer-events:none}
+  #toast.show{opacity:1}
+  .info{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:10px;
+    padding:11px 14px;font-size:12.5px;line-height:1.55}
+</style>
+</head>
+<body>
+<header>
+  <h1>dblab-agent · admin</h1>
+  <span class="tag">LLM 配置管理</span>
+  <span class="spacer"></span>
+  <a href="/">← Back to chat</a>
+</header>
+
+<main>
+  <div class="info">🔐 Keys are stored encrypted in <code>data/settings.json</code> (gitignored)
+    and override the environment defaults. Leave a key field blank to keep the
+    existing one. 密钥加密存于本地，留空表示沿用当前值。</div>
+
+  <div class="card">
+    <h2>🧠 Text / Agent model <span id="text_badge" class="badge off">no key</span></h2>
+    <p class="sub">Drives the SQL-running agent (tool calling). Default: DeepSeek.
+       文本对话与跑 SQL 的主模型。</p>
+    <label>API key</label>
+    <input id="text_key" type="password" placeholder="leave blank to keep current" autocomplete="off" />
+    <div class="hint">current: <span id="text_key_masked">—</span></div>
+    <label>Base URL</label>
+    <input id="text_base" placeholder="https://api.deepseek.com/v1/chat/completions" />
+    <label>Model</label>
+    <input id="text_model" placeholder="deepseek-chat" />
+  </div>
+
+  <div class="card">
+    <h2>🖼️ Vision / multimodal model <span id="vision_badge" class="badge off">no key</span></h2>
+    <p class="sub">Handles image messages (SQL error screenshots, schemas…).
+       Default: Zhipu GLM-4V. 处理上传图片的多模态模型（智谱 GLM-4V）。</p>
+    <label>API key</label>
+    <input id="vision_key" type="password" placeholder="leave blank to keep current" autocomplete="off" />
+    <div class="hint">current: <span id="vision_key_masked">—</span></div>
+    <label>Base URL</label>
+    <input id="vision_base" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions" />
+    <label>Model</label>
+    <input id="vision_model" placeholder="glm-4v-plus" />
+  </div>
+</main>
+
+<div class="bar">
+  <input class="token" id="admin_token" type="password" placeholder="admin token (if set)" autocomplete="off" />
+  <button id="save">Save settings</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+function toast(msg, ok=true){const t=$("#toast");t.textContent=(ok?"✓ ":"⚠ ")+msg;t.style.background=ok?"#0f172a":"#b91c1c";t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);}
+
+async function load(){
+  const r = await fetch("/api/admin/settings"); const s = await r.json();
+  for(const sec of ["text","vision"]){
+    $("#"+sec+"_base").value = s[sec].base_url || "";
+    $("#"+sec+"_model").value = s[sec].model || "";
+    $("#"+sec+"_key_masked").textContent = s[sec].has_key ? s[sec].key_masked : "(none)";
+    const b = $("#"+sec+"_badge");
+    b.textContent = s[sec].has_key ? "configured" : "no key";
+    b.className = "badge " + (s[sec].has_key ? "on":"off");
+  }
+}
+
+$("#save").onclick = async () => {
+  $("#save").disabled = true;
+  const body = {
+    text:{api_key:$("#text_key").value, base_url:$("#text_base").value, model:$("#text_model").value},
+    vision:{api_key:$("#vision_key").value, base_url:$("#vision_base").value, model:$("#vision_model").value},
+  };
+  const headers = {"Content-Type":"application/json"};
+  if($("#admin_token").value) headers["X-Admin-Token"] = $("#admin_token").value;
+  try{
+    const r = await fetch("/api/admin/settings",{method:"POST",headers,body:JSON.stringify(body)});
+    if(!r.ok){const e=await r.json();toast(e.error||"save failed",false);}
+    else{$("#text_key").value="";$("#vision_key").value="";await load();toast("saved");}
+  }catch(e){toast(String(e),false);}
+  finally{$("#save").disabled=false;}
+};
+
+load();
+</script>
+</body>
+</html>

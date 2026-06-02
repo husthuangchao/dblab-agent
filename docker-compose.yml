@@ -1,0 +1,103 @@
+# One command to a working demo:  docker compose up -d
+# Brings up PostgreSQL + MySQL + openGauss, seeds them, and serves the agent
+# at http://localhost:9527  (set DBLAB_LLM_API_KEY in a .env file first).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: demo
+    ports: ["${PG_PUBLISH:-5432}:5432"]
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d demo"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    networks: [dblab]
+
+  mysql:
+    image: mysql:8.0
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql
+      MYSQL_DATABASE: demo
+    ports: ["${MYSQL_PUBLISH:-3306}:3306"]
+    volumes: ["mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-pmysql"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [dblab]
+
+  opengauss:
+    image: enmotech/opengauss:5.0.0
+    # openGauss needs privileged mode (cgroups / shared memory) or it exits
+    # right after init.
+    privileged: true
+    environment:
+      # openGauss password policy: 8-16 chars incl. upper+lower+digit+special.
+      GS_PASSWORD: ${OPENGAUSS_PASSWORD:-Gauss@bcd1234}
+      GS_USERNAME: gaussdb
+      GS_DB: postgres
+    ports: ["${OPENGAUSS_PUBLISH:-5433}:5432"]
+    volumes: ["opengauss-data:/var/lib/opengauss"]
+    networks: [dblab]
+
+  # One-shot: waits for all three DBs, creates the demo schema + rows, exits.
+  seeder:
+    build: .
+    command: ["python", "-m", "dblab_agent.seed"]
+    environment: &db_env
+      PG_HOST: postgres
+      PG_PORT: "5432"
+      PG_USER: postgres
+      PG_PASSWORD: postgres
+      PG_DB: demo
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: root
+      MYSQL_PASSWORD: mysql
+      MYSQL_DB: demo
+      OPENGAUSS_HOST: opengauss
+      OPENGAUSS_PORT: "5432"
+      OPENGAUSS_USER: gaussdb
+      OPENGAUSS_PASSWORD: ${OPENGAUSS_PASSWORD:-Gauss@bcd1234}
+      OPENGAUSS_DB: postgres
+    depends_on:
+      postgres: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      opengauss: {condition: service_started}
+    restart: "no"
+    networks: [dblab]
+
+  app:
+    build: .
+    environment:
+      <<: *db_env
+      # Bring your own OpenAI-compatible LLM (see .env.example).
+      DBLAB_LLM_API_KEY: ${DBLAB_LLM_API_KEY:-}
+      DBLAB_LLM_BASE_URL: ${DBLAB_LLM_BASE_URL:-https://api.deepseek.com/v1/chat/completions}
+      DBLAB_LLM_MODEL: ${DBLAB_LLM_MODEL:-deepseek-chat}
+    ports: ["${APP_PUBLISH:-9527}:8000"]
+    volumes: ["./data:/app/data"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      mysql: {condition: service_healthy}
+      opengauss: {condition: service_started}
+    networks: [dblab]
+
+networks:
+  dblab:
+    name: dblab-agent-net
+
+volumes:
+  pg-data:
+  mysql-data:
+  opengauss-data:
