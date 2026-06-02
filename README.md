@@ -41,7 +41,7 @@ The model is never asked to *be* a database; it is asked to *interrogate* one an
 
 ## Quickstart (Docker)
 
-Spins up the agent **plus** PostgreSQL + MySQL + openGauss, seeds them with demo data, and serves the UI at **http://localhost:9527**.
+Spins up the agent **plus MySQL 8, PostgreSQL 17, and openGauss 3.0**, seeds them with demo data, and serves it at **http://localhost:9527** — a landing page at `/`, the chat agent at `/chat`, and the admin/keys page at `/admin`.
 
 ```bash
 git clone https://github.com/husthuangchao/dblab-agent.git
@@ -50,7 +50,8 @@ cp .env.example .env        # then put your LLM API key in .env
 docker compose up -d        # first run pulls images + builds (a few minutes)
 ```
 
-Open <http://localhost:9527> and ask, e.g.:
+Open <http://localhost:9527> — the landing page shows the three databases coming
+online live; click **Launch the agent** and ask, e.g.:
 
 - *Does MySQL support window functions? Prove it.*
 - *Compare `CONCAT(NULL, 'x')` behaviour across PostgreSQL and MySQL.*
@@ -136,7 +137,9 @@ dblab_agent/
   agent.py         plan-and-execute loop + the anti-hallucination prompt
   server.py        FastAPI app (SSE streaming, connection API, UI)
   seed.py          idempotent demo-data loader
+web/home.html      landing page (live DB status, no CDN)
 web/index.html     single-file streaming chat UI (no CDN)
+web/admin.html     LLM key management page
 docker-compose.yml app + 3 databases + seeder
 tests/             pure-logic tests (no DB required)
 ```

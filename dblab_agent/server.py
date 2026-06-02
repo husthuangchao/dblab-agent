@@ -30,7 +30,13 @@ def health():
 
 
 @app.get("/")
-def index():
+def home():
+    return FileResponse(WEB_DIR / "home.html")
+
+
+@app.get("/chat")
+@app.get("/app")
+def chat_ui():
     return FileResponse(WEB_DIR / "index.html")
 
 
@@ -65,6 +71,15 @@ async def api_save_settings(request: Request):
 @app.get("/api/connections")
 def api_list_connections():
     return {"connections": list_connections()}
+
+
+@app.get("/api/ping/{conn_id}")
+def api_ping(conn_id: str):
+    """Cheap liveness probe for one connection — runs SELECT 1."""
+    from .db_pool import exec_sql
+    r = exec_sql(conn_id, "SELECT 1")
+    return {"ok": bool(r.get("ok")), "elapsed_ms": r.get("elapsed_ms"),
+            "error": r.get("error")}
 
 
 @app.post("/api/connections")

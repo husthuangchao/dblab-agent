@@ -39,19 +39,19 @@ def _builtin_connections() -> dict:
     same image works under docker-compose (service names) or against a host."""
     return {
         "postgres": _cfg(
-            "PostgreSQL", "pg",
+            "PostgreSQL 17", "pg",
             os.getenv("PG_HOST", "127.0.0.1"), os.getenv("PG_PORT", "5432"),
             os.getenv("PG_USER", "postgres"), os.getenv("PG_PASSWORD", "postgres"),
             os.getenv("PG_DB", "demo"),
         ),
         "mysql": _cfg(
-            "MySQL", "mysql",
+            "MySQL 8.0", "mysql",
             os.getenv("MYSQL_HOST", "127.0.0.1"), os.getenv("MYSQL_PORT", "3306"),
             os.getenv("MYSQL_USER", "root"), os.getenv("MYSQL_PASSWORD", "mysql"),
             os.getenv("MYSQL_DB", "demo"),
         ),
         "opengauss": _cfg(
-            "openGauss", "pg",
+            "openGauss 3.0", "pg",
             os.getenv("OPENGAUSS_HOST", "127.0.0.1"), os.getenv("OPENGAUSS_PORT", "5433"),
             os.getenv("OPENGAUSS_USER", "gaussdb"),
             os.getenv("OPENGAUSS_PASSWORD", "Gauss@bcd1234"),

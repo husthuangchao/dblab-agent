@@ -4,7 +4,7 @@
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -37,7 +37,7 @@ services:
     networks: [dblab]
 
   opengauss:
-    image: enmotech/opengauss:5.0.0
+    image: enmotech/opengauss:3.0.0
     # openGauss needs privileged mode (cgroups / shared memory) or it exits
     # right after init.
     privileged: true
