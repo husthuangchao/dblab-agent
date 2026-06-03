@@ -1,10 +1,24 @@
-# dblab-agent
+# 🛢️ dblab-agent
 
 **An LLM agent that answers PostgreSQL / MySQL / openGauss questions by running real SQL — not by hallucinating.**
+
+![license](https://img.shields.io/badge/license-MIT-blue)
+![python](https://img.shields.io/badge/python-3.12%2B-blue)
+![databases](https://img.shields.io/badge/databases-PostgreSQL%2017%20%7C%20MySQL%208%20%7C%20openGauss%203.0-1e3a8a)
+![LLM](https://img.shields.io/badge/LLM-OpenAI--compatible%20(DeepSeek)-f59e0b)
+[![stars](https://img.shields.io/github/stars/husthuangchao/dblab-agent?style=social)](https://github.com/husthuangchao/dblab-agent/stargazers)
 
 > 🔒 **The iron rule:** no claim without a query. Before the agent says a function, syntax, data type, or feature is *supported / not supported / behaves a certain way*, it **must** run a minimal test against a live database and read the actual result. **Untested = no conclusion.**
 
 *一个靠**真实跑 SQL** 来消除幻觉的数据库 agent，覆盖 PostgreSQL、MySQL、openGauss。每一句"支持/不支持"都由一条真实查询背书——没跑过，就不下结论。*
+
+## Screenshots
+
+| Landing page | Smart Agent chat |
+|---|---|
+| ![landing](docs/landing.png) | ![chat](docs/chat.png) |
+
+The chat shows every tool call (the exact SQL it ran and the rows it got back), then a grounded answer that labels **tested** facts apart from background knowledge.
 
 ---
 
