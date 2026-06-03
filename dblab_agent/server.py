@@ -82,6 +82,13 @@ def api_ping(conn_id: str):
             "error": r.get("error")}
 
 
+@app.get("/api/databases/{conn_id}")
+def api_databases(conn_id: str):
+    """List databases on a connection (powers the UI db dropdown)."""
+    from .tools import list_databases
+    return list_databases(conn_id)
+
+
 @app.post("/api/connections")
 async def api_add_connection(request: Request):
     body = await request.json()
@@ -107,13 +114,14 @@ async def api_agent(request: Request):
     body = await request.json()
     messages = body.get("messages") or []
     selected_conn = body.get("connection")
+    selected_db = body.get("dbname")
     if not isinstance(messages, list) or not messages:
         return JSONResponse({"error": "messages must be a non-empty list"}, status_code=400)
 
     # Starlette runs this sync generator in a worker thread, so the blocking
     # SQL/LLM calls inside run_agent don't stall the event loop.
     def event_stream():
-        for event in run_agent(messages, selected_conn):
+        for event in run_agent(messages, selected_conn, selected_db):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

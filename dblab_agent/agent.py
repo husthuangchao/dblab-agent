@@ -138,10 +138,11 @@ def _preview(result: dict) -> dict:
     return out
 
 
-def run_agent(user_messages: list[dict], selected_conn: str | None = None):
+def run_agent(user_messages: list[dict], selected_conn: str | None = None,
+              selected_db: str | None = None):
     """Drive the loop. `user_messages` is the running chat history
     ([{role, content}, ...]); the system prompt is prepended here.
-    `selected_conn` is the connection the user picked in the UI, if any."""
+    `selected_conn` / `selected_db` are what the user picked in the UI, if any."""
     # Image attached → route this turn to the multimodal model (no SQL tools).
     if _has_image(user_messages):
         yield from _run_vision(user_messages)
@@ -151,6 +152,8 @@ def run_agent(user_messages: list[dict], selected_conn: str | None = None):
     if selected_conn:
         system += (f"\n\nThe user has selected the connection `{selected_conn}` in "
                    f"the UI. Prefer it for questions that don't name another database.")
+        if selected_db:
+            system += f" Their selected database is `{selected_db}`."
     messages: list[dict] = [{"role": "system", "content": system}]
     messages.extend(user_messages)
 

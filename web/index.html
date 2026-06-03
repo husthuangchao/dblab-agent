@@ -1,302 +1,394 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>dblab-agent · run SQL, not your mouth</title>
+<title>dblab-agent · Smart Agent</title>
 <style>
   :root{
-    --navy:#1e3a8a; --navy-d:#152a63; --amber:#f59e0b; --amber-d:#d97706;
-    --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --bg:#f1f5f9; --card:#fff;
-    --tool:#0e7490; --err:#b91c1c; --ok:#15803d;
+    --primary:#1e3a8a; --primary-d:#152a63; --accent:#f59e0b; --accent-d:#d97706;
+    --accent-soft:#fde68a; --ink:#303133; --muted:#64748b; --border:#e2e8f0;
+    --line:#ebeef5; --bg:#f7f8fa; --user-bg:#eef2ff; --user-bd:#c7d2fe;
+    --font-serif:'Playfair Display',Georgia,'Times New Roman',serif;
   }
   *{box-sizing:border-box}
+  html,body{height:100%}
   body{margin:0;font-family:Inter,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-       color:var(--ink);background:var(--bg);height:100vh;display:flex;flex-direction:column}
-  header{background:linear-gradient(135deg,var(--navy),var(--navy-d));color:#fff;
-         padding:14px 22px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 10px rgba(0,0,0,.15)}
-  header h1{font-size:18px;margin:0;font-weight:700;letter-spacing:.3px}
-  header .tag{font-size:12px;color:#cbd5e1}
-  header .spacer{flex:1}
-  header select,header button{font:inherit}
-  select#conn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.3);
-       border-radius:8px;padding:7px 10px;font-size:13px}
-  select#conn option{color:#000}
-  .ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);
-       border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer}
-  .ghost:hover{background:rgba(255,255,255,.12)}
-  main{flex:1;overflow-y:auto;padding:24px 0}
-  #chat{max-width:860px;margin:0 auto;padding:0 18px;display:flex;flex-direction:column;gap:16px}
-  .msg{display:flex;gap:12px;align-items:flex-start}
-  .msg .avatar{width:30px;height:30px;border-radius:8px;flex:none;display:flex;align-items:center;
-       justify-content:center;font-size:14px;font-weight:700;color:#fff}
-  .msg.user .avatar{background:var(--amber)}
-  .msg.bot .avatar{background:var(--navy)}
-  .bubble{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 15px;
-       line-height:1.6;font-size:14.5px;max-width:100%;overflow-x:auto}
-  .msg.user .bubble{background:#fff7ed;border-color:#fed7aa}
-  .bubble p{margin:.4em 0}
-  .bubble code{background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:4px;font-size:13px;
-       font-family:"SFMono-Regular",Consolas,monospace}
-  .bubble pre{background:#0f172a;color:#e2e8f0;padding:11px 13px;border-radius:8px;overflow-x:auto;
-       font-size:12.5px;line-height:1.5;font-family:"SFMono-Regular",Consolas,monospace}
-  .bubble pre code{background:none;color:inherit;padding:0}
-  .steps{display:flex;flex-direction:column;gap:6px;margin:2px 0}
-  .step{font-size:12.5px;border:1px solid var(--line);border-left:3px solid var(--tool);
-       background:#f8fafc;border-radius:6px;padding:7px 10px;color:#334155}
-  .step .t{font-weight:600;color:var(--tool)}
-  .step.err{border-left-color:var(--err)} .step.err .t{color:var(--err)}
-  .step pre{background:#0f172a;color:#e2e8f0;border-radius:6px;padding:8px 10px;margin:6px 0 0;
-       font-size:11.5px;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
-  .step summary{cursor:pointer;outline:none}
-  footer{border-top:1px solid var(--line);background:#fff;padding:14px 18px}
-  .composer{max-width:860px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
-  textarea#input{flex:1;resize:none;font:inherit;font-size:14.5px;border:1px solid var(--line);
-       border-radius:12px;padding:12px 14px;line-height:1.5;max-height:160px;outline:none}
-  textarea#input:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(30,58,138,.12)}
-  #send{background:var(--amber);color:#fff;border:none;border-radius:12px;padding:0 22px;height:46px;
-       font-size:14.5px;font-weight:600;cursor:pointer}
-  #send:hover{background:var(--amber-d)} #send:disabled{opacity:.5;cursor:default}
-  .hint{max-width:860px;margin:8px auto 0;color:var(--muted);font-size:12px;text-align:center}
-  .examples{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:10px}
-  .examples button{background:#fff;border:1px solid var(--line);border-radius:20px;padding:6px 13px;
-       font-size:12.5px;color:#475569;cursor:pointer}
-  .examples button:hover{border-color:var(--amber);color:var(--amber-d)}
-  .empty{max-width:680px;margin:6vh auto;text-align:center;color:var(--muted)}
-  .empty h2{color:var(--ink);font-size:22px;margin:0 0 6px}
-  .empty .rule{display:inline-block;margin-top:14px;background:#fff7ed;border:1px solid #fed7aa;
-       color:#9a3412;border-radius:10px;padding:10px 16px;font-size:13.5px}
-  /* modal */
-  .modal-bg{position:fixed;inset:0;background:rgba(15,23,42,.5);display:none;align-items:center;
-       justify-content:center;z-index:50}
-  .modal{background:#fff;border-radius:14px;padding:22px;width:380px;max-width:92vw}
-  .modal h3{margin:0 0 14px} .modal label{display:block;font-size:12.5px;color:var(--muted);margin:9px 0 3px}
-  .modal input,.modal select{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
-  .modal .row{display:flex;gap:10px} .modal .row>div{flex:1}
-  .modal .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
-  .modal .acts button{padding:9px 16px;border-radius:8px;font-size:13.5px;cursor:pointer;border:none}
-  .primary{background:var(--navy);color:#fff} .cancel{background:#e2e8f0;color:#334155}
+    color:var(--ink);background:var(--bg);display:flex;flex-direction:column;height:100vh}
+
+  /* ── toolbar ── */
+  .toolbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#fff;
+    border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .toolbar .title{font-weight:700;font-size:15px;margin-right:4px}
+  .toolbar .title a{color:inherit;text-decoration:none}
+  .toolbar select{font:inherit;font-size:13px;padding:6px 9px;border:1px solid var(--border);
+    border-radius:8px;background:#fff;color:var(--ink);max-width:240px}
+  .toolbar .sp{flex:1}
+  .toolbar button,.toolbar a.btn{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--border);
+    background:#fff;color:#606266;border-radius:8px;cursor:pointer;text-decoration:none;line-height:1.4}
+  .toolbar button:hover,.toolbar a.btn:hover{border-color:var(--primary);color:var(--primary);background:var(--user-bg)}
+  .toolbar button:disabled{opacity:.5;cursor:default}
+
+  /* ── stream ── */
+  .stream{flex:1;overflow-y:auto;padding:20px 24px}
+  .empty{max-width:880px;margin:34px auto 0;padding:0 20px}
+  .hero{text-align:center;margin-bottom:34px}
+  .hero-icon{font-size:52px;margin-bottom:14px;filter:drop-shadow(0 6px 14px rgba(30,58,138,.22))}
+  .hero-title{margin:0 0 10px;font-size:36px;font-weight:700;font-family:var(--font-serif);
+    font-style:italic;color:var(--primary);letter-spacing:-.4px}
+  .hero-sub{margin:0 0 12px;color:var(--muted);font-size:14px}
+  .hero-rule{display:inline-block;margin:6px 0 18px;background:#fff7ed;border:1px solid var(--accent-soft);
+    color:#9a3412;border-radius:10px;padding:8px 15px;font-size:13px}
+  .hero-tools{display:inline-flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .tool-tag{font-size:11px;padding:4px 12px;border-radius:999px;background:#fef3c7;color:#92400e;
+    border:1px solid var(--accent-soft);font-weight:500}
+  .suggest{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+  .scard{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;
+    transition:.18s;position:relative;overflow:hidden}
+  .scard:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 12px 24px -8px rgba(30,58,138,.18)}
+  .scard .ch{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .scard .ci{font-size:17px}
+  .scard .cc{font-size:11px;font-weight:600;color:#909399;text-transform:uppercase;letter-spacing:.6px}
+  .scard .ct{font-size:13px;color:#303133;line-height:1.55}
+
+  /* ── turns / bubbles ── */
+  .turn{display:flex;margin-bottom:14px}
+  .turn.user{justify-content:flex-end}
+  .turn.assistant{justify-content:flex-start}
+  .bubble{max-width:720px;padding:12px 16px;border-radius:12px;background:#fff;border:1px solid var(--line);
+    line-height:1.6;font-size:14px;color:var(--ink)}
+  .turn.assistant .bubble{max-width:min(92%,1080px)}
+  .turn.user .bubble{background:var(--user-bg);border-color:var(--user-bd);color:var(--primary)}
+  .bubble-images{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+  .bubble-image{max-height:170px;border-radius:8px;border:1px solid var(--user-bd)}
+
+  /* tool-call collapsibles */
+  .tool-calls{margin-bottom:8px;display:flex;flex-direction:column;gap:5px}
+  details.tc{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#f5f7fa}
+  details.tc>summary{list-style:none;cursor:pointer;font-size:12px;color:#606266;padding:7px 12px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;display:flex;align-items:center;gap:8px}
+  details.tc>summary::-webkit-details-marker{display:none}
+  details.tc>summary::before{content:"▸";color:#909399}
+  details.tc[open]>summary::before{content:"▾"}
+  .tc .tn{color:var(--primary);font-weight:600;font-family:inherit}
+  .tc .ms{color:#909399;margin-left:auto}
+  .tc .ms.run{color:var(--accent-d)}
+  .tc-body{padding:8px 12px;background:#fff;border-top:1px solid var(--border)}
+  .tc-lbl{font-size:11px;color:#909399;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 4px}
+  .tc-pre{margin:0 0 8px;padding:8px 10px;background:#0d1117;color:#d4d4d4;font-size:12px;border-radius:6px;
+    max-height:260px;overflow:auto;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
+  /* sql + result rendering inside a tool call */
+  .sqlbox{margin:0 0 8px;padding:6px 10px 6px 12px;background:#0d1117;color:#e6edf3;border-left:2px solid rgba(245,158,11,.55);
+    border-radius:0 6px 6px 0;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;white-space:pre-wrap;overflow-x:auto}
+  .restable{width:100%;border-collapse:collapse;font-size:11.5px;background:#0d1117;border-radius:6px;overflow:hidden;
+    display:block;overflow-x:auto}
+  .restable th{color:var(--accent);text-align:left;padding:4px 12px 4px 10px;border-bottom:1px solid #30363d;
+    white-space:nowrap;font-family:ui-monospace,Consolas,monospace}
+  .restable td{padding:3px 12px 3px 10px;color:#e6edf3;white-space:nowrap;font-family:ui-monospace,Consolas,monospace}
+  .restable td .null{color:#6e7681;font-style:italic}
+  .restable tr:nth-child(even) td{background:rgba(255,255,255,.02)}
+  .resmeta{color:#6e7681;font-size:11px;margin-top:4px;font-family:ui-monospace,Consolas,monospace}
+
+  /* assistant markdown content */
+  .content{word-break:break-word}
+  .md-text{white-space:pre-wrap}
+  .md-text code,.content :not(pre)>code{background:#f4f4f5;border:1px solid #e4e4e7;border-radius:3px;
+    padding:1px 6px;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;color:#be185d}
+  .content pre{background:#0d1117;color:#e6edf3;border-radius:8px;padding:11px 13px;overflow-x:auto;
+    font-size:12.5px;line-height:1.55;font-family:ui-monospace,Consolas,monospace;margin:8px 0}
+  .content pre code{background:none;border:0;color:inherit;padding:0}
+  .md-table-wrap{overflow-x:auto;margin:10px 0}
+  .md-table{border-collapse:collapse;font-size:13px;line-height:1.5;background:#fff}
+  .md-table th,.md-table td{border:1px solid #e4e4e7;padding:6px 12px;vertical-align:top;text-align:left}
+  .md-table th{background:#f4f4f5;font-weight:600;color:#18181b;white-space:nowrap}
+  .md-table tbody tr:nth-child(even){background:#fafafa}
+  .md-table code{background:#f4f4f5;border:1px solid #e4e4e7;border-radius:3px;padding:1px 6px;
+    font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;color:#be185d}
+
+  .meta{margin-top:8px;font-size:11px;color:#909399}
+  .progress{display:flex;flex-direction:column;gap:5px;color:var(--muted);font-size:12.5px}
+  .progress .now{display:flex;align-items:center;gap:8px}
+  .dots{display:inline-flex;gap:3px}
+  .dots i{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:bln 1s infinite}
+  .dots i:nth-child(2){animation-delay:.15s} .dots i:nth-child(3){animation-delay:.3s}
+  @keyframes bln{0%,80%,100%{opacity:.3}40%{opacity:1}}
+
+  /* ── composer ── */
+  footer{border-top:1px solid var(--line);background:#fff;padding:12px 18px}
+  #thumb{max-width:900px;margin:0 auto 8px;display:none}
+  #thumb span{position:relative;display:inline-block}
+  #thumbImg{height:54px;border-radius:8px;border:1px solid var(--border)}
+  #thumbX{position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;border:none;
+    background:#0f172a;color:#fff;cursor:pointer;font-size:12px;line-height:1}
+  .composer{max-width:900px;margin:0 auto;display:flex;gap:10px;align-items:flex-end}
+  #attach{height:46px;width:46px;border:1px solid var(--border);background:#fff;color:var(--primary);
+    border-radius:12px;font-size:18px;cursor:pointer}
+  #attach:hover{border-color:var(--accent);background:#fff7ed}
+  textarea#input{flex:1;resize:none;font:inherit;font-size:14.5px;border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;line-height:1.5;max-height:180px;outline:none}
+  textarea#input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(30,58,138,.1)}
+  #send{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:0 22px;height:46px;
+    font-size:14.5px;font-weight:600;cursor:pointer}
+  #send:hover{background:var(--accent-d)} #send:disabled{opacity:.5;cursor:default}
+  .hint{max-width:900px;margin:8px auto 0;color:var(--muted);font-size:12px;text-align:center}
 </style>
 </head>
 <body>
-<header>
-  <h1><a href="/" style="color:#fff;text-decoration:none" title="Home">dblab-agent</a></h1>
-  <span class="tag">run SQL, don't hallucinate · 真跑 SQL，不瞎编</span>
-  <span class="spacer"></span>
-  <label class="tag" for="conn">DB</label>
-  <select id="conn" title="Connection the agent uses by default"></select>
-  <button class="ghost" id="addBtn">+ Connection</button>
-  <a class="ghost" href="/admin" style="text-decoration:none" title="LLM settings">⚙ Admin</a>
-</header>
+<div class="toolbar">
+  <span class="title"><a href="/" title="Home">🤖 Smart Agent</a></span>
+  <select id="conn" title="默认连接（Agent 也能自己挑）"></select>
+  <select id="db" title="默认数据库"><option value="">(默认 db)</option></select>
+  <span class="sp"></span>
+  <button id="export" disabled>📥 导出</button>
+  <button id="clear">清空对话</button>
+  <a class="btn" href="/admin" title="LLM 配置">⚙ Admin</a>
+</div>
 
-<main>
-  <div id="chat">
-    <div class="empty" id="empty">
-      <h2>Ask about PostgreSQL, MySQL, or openGauss</h2>
-      <p>The agent answers by running real SQL against live databases — every
-         "supported / not supported" claim is backed by an actual query.</p>
-      <div class="rule">🔒 Iron rule: no claim without a query. Untested = no conclusion.</div>
-      <div class="examples" id="examples"></div>
-    </div>
-  </div>
-</main>
-
-<footer>
-  <div id="thumb" style="max-width:860px;margin:0 auto 8px;display:none">
-    <span style="position:relative;display:inline-block">
-      <img id="thumbImg" style="height:54px;border-radius:8px;border:1px solid var(--line)" />
-      <button id="thumbX" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;
-        border:none;background:#0f172a;color:#fff;cursor:pointer;font-size:12px;line-height:1">×</button>
-    </span>
-  </div>
-  <div class="composer">
-    <button id="attach" class="ghost" style="height:46px;width:46px;color:var(--navy);border-color:var(--line);font-size:18px;padding:0" title="Attach a screenshot">📎</button>
-    <input type="file" id="file" accept="image/*" style="display:none" />
-    <textarea id="input" rows="1" placeholder="Ask, or attach a screenshot of a SQL error. (Shift+Enter = newline)"></textarea>
-    <button id="send">Send</button>
-  </div>
-  <div class="hint">Text questions run real SQL; attached images go to the vision model.</div>
-</footer>
-
-<div class="modal-bg" id="modalBg">
-  <div class="modal">
-    <h3>Add a connection</h3>
-    <label>Label</label><input id="m_label" placeholder="My Postgres" />
-    <div class="row">
-      <div><label>Driver</label>
-        <select id="m_driver"><option value="pg">PostgreSQL / openGauss</option><option value="mysql">MySQL</option></select>
+<div class="stream" id="stream">
+  <div class="empty" id="empty">
+    <div class="hero">
+      <div class="hero-icon">🤖</div>
+      <h1 class="hero-title">Smart Agent</h1>
+      <p class="hero-sub">用自然语言提问，Agent 会自己决定调用哪些工具，<b>靠真实跑 SQL 给结论</b>。<br>
+        Ask in plain language — it runs real SQL against PostgreSQL / MySQL / openGauss.</p>
+      <div class="hero-rule">🔒 铁律：没实跑过 SQL，就不下结论 · No claim without a query.</div>
+      <div class="hero-tools">
+        <span class="tool-tag">列连接</span><span class="tool-tag">列库表</span>
+        <span class="tool-tag">看对象</span><span class="tool-tag">跑 SQL</span>
+        <span class="tool-tag">批量执行</span><span class="tool-tag">识图诊断</span>
       </div>
-      <div><label>Database</label><input id="m_db" placeholder="postgres" /></div>
     </div>
-    <div class="row">
-      <div><label>Host</label><input id="m_host" placeholder="127.0.0.1" /></div>
-      <div><label>Port</label><input id="m_port" placeholder="5432" /></div>
-    </div>
-    <div class="row">
-      <div><label>User</label><input id="m_user" placeholder="postgres" /></div>
-      <div><label>Password</label><input id="m_pass" type="password" /></div>
-    </div>
-    <div class="acts">
-      <button class="cancel" id="m_cancel">Cancel</button>
-      <button class="primary" id="m_save">Save</button>
-    </div>
+    <div class="suggest" id="suggest"></div>
   </div>
 </div>
 
+<footer>
+  <div id="thumb"><span><img id="thumbImg" /><button id="thumbX">×</button></span></div>
+  <div class="composer">
+    <button id="attach" title="上传 SQL 报错截图">📎</button>
+    <input type="file" id="file" accept="image/*" style="display:none" />
+    <textarea id="input" rows="1" placeholder="比如：mysql 支持窗口函数吗？跑一个证明 / 看看 customers 表结构 / 对比 PG 和 MySQL 的 CONCAT(NULL)（Shift+Enter 换行）"></textarea>
+    <button id="send">发送</button>
+  </div>
+  <div class="hint">每个结论都由可展开的工具调用背书 · 附图走视觉模型识别</div>
+</footer>
+
 <script>
 const $ = s => document.querySelector(s);
-const chat = $("#chat"), connSel = $("#conn"), input = $("#input"), sendBtn = $("#send");
-let history = [];            // [{role, content}]
+const stream = $("#stream"), connSel = $("#conn"), dbSel = $("#db"), input = $("#input"), sendBtn = $("#send");
+let history = [];          // [{role, content}]  content may be string or content-list (image)
 let busy = false;
-let pendingImage = null;     // data URL of an attached screenshot
+let pendingImage = null;
 
-const EXAMPLES = [
-  "Does MySQL support window functions? Prove it.",
-  "Compare CONCAT behaviour on NULL across PostgreSQL and MySQL.",
-  "What tables are in the demo database?",
-  "Does openGauss support EXPLAIN ANALYZE? Run it.",
+const TOOL_LABELS = {
+  list_connections:"查询数据库列表", list_databases:"查询数据库", list_tables:"查询表结构",
+  get_object_detail:"查询对象详情", exec_sql:"执行查询", exec_sql_batch:"批量查询",
+};
+const friendly = n => TOOL_LABELS[n] || "查询";
+
+const SUGGESTIONS = [
+  {icon:"🪟", cat:"兼容性", text:"MySQL 支持窗口函数 ROW_NUMBER() 吗？跑一个证明"},
+  {icon:"🔀", cat:"对比", text:"对比 PostgreSQL 和 MySQL 里 CONCAT(NULL,'x') 的行为"},
+  {icon:"🧬", cat:"openGauss", text:"openGauss 支持 generate_series 吗？实测一下"},
+  {icon:"📋", cat:"探索", text:"demo 库里有哪些表？看看 customers 表的结构"},
+  {icon:"🔢", cat:"查询", text:"orders 表里每种状态各有多少单？"},
+  {icon:"⚙️", cat:"诊断", text:"这三个库的版本号分别是多少？并排告诉我"},
 ];
 
-function escapeHtml(s){return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function escapeHtml(s){return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
-// tiny markdown: code fences, inline code, **bold**, paragraphs
-function md(t){
-  t = escapeHtml(t);
-  t = t.replace(/```([\s\S]*?)```/g,(_,c)=>`<pre><code>${c.replace(/^\n/,"")}</code></pre>`);
-  t = t.replace(/`([^`]+)`/g,"<code>$1</code>");
-  t = t.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
-  return t.split(/\n{2,}/).map(p=>p.includes("<pre>")?p:`<p>${p.replace(/\n/g,"<br>")}</p>`).join("");
+/* ── markdown: tables + code fences + inline code + bold, text pre-wrap ── */
+function renderCell(raw){
+  let s = escapeHtml(raw);
+  s = s.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+  return s;
 }
-
-function addMsg(role){
-  $("#empty")?.remove();
-  const wrap = document.createElement("div");
-  wrap.className = "msg " + (role==="user"?"user":"bot");
-  wrap.innerHTML = `<div class="avatar">${role==="user"?"You":"AI"}</div>`;
-  const body = document.createElement("div");
-  body.style.flex="1"; body.style.minWidth="0";
-  wrap.appendChild(body);
-  chat.appendChild(wrap);
-  scroll();
-  return body;
+function inlineText(raw){
+  let s = escapeHtml(raw);
+  s = s.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
+  return s;
 }
-function scroll(){ const m=$("main"); m.scrollTop=m.scrollHeight; }
-
-function renderStep(container, ev){
-  const d = document.createElement("details");
-  d.className = "step" + (ev.result && ev.result.ok===false ? " err":"");
-  d.open = false;
-  const args = ev.args ? Object.entries(ev.args).map(([k,v])=>`${k}=${typeof v==="string"?v:JSON.stringify(v)}`).join("  ") : "";
-  const head = ev.type==="tool_call"
-    ? `<span class="t">▸ ${ev.name}</span> ${escapeHtml(args).slice(0,300)}`
-    : `<span class="t">⤷ ${ev.name} result</span>`;
-  d.innerHTML = `<summary>${head}</summary>`;
-  if(ev.type==="tool_result"){
-    const pre = document.createElement("pre");
-    pre.textContent = JSON.stringify(ev.result, null, 2);
-    d.appendChild(pre); d.open = false;
+const isRow = l => /^\s*\|.+\|\s*$/.test(l);
+const isSep = l => /^\s*\|[\s:|-]+\|\s*$/.test(l) && l.includes("-");
+const cells = l => {let s=l.trim();if(s.startsWith("|"))s=s.slice(1);if(s.endsWith("|"))s=s.slice(0,-1);return s.split("|").map(c=>c.trim());};
+function md(text){
+  const lines = (text||"").split("\n"); let out=""; let buf=[]; let i=0;
+  const flush=()=>{ if(buf.length){ out+=`<div class="md-text">${inlineText(buf.join("\n"))}</div>`; buf=[]; } };
+  while(i<lines.length){
+    const cur=lines[i];
+    if(/^\s*```/.test(cur)){
+      flush(); const code=[]; i++;
+      while(i<lines.length && !/^\s*```/.test(lines[i])){ code.push(lines[i]); i++; }
+      i++; out+=`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`; continue;
+    }
+    const hm=cur.match(/^(#{1,6})\s+(.*)$/);
+    if(hm){ flush(); const lvl=hm[1].length; const sz=({1:"1.35em",2:"1.2em",3:"1.08em"})[lvl]||"1em";
+      out+=`<div style="font-weight:700;font-size:${sz};margin:12px 0 4px;color:#18181b">${inlineText(hm[2])}</div>`; i++; continue; }
+    if(isRow(cur) && i+1<lines.length && isSep(lines[i+1])){
+      flush(); const hs=cells(cur); const rows=[]; i+=2;
+      while(i<lines.length && isRow(lines[i])){ rows.push(cells(lines[i])); i++; }
+      let t=`<div class="md-table-wrap"><table class="md-table"><thead><tr>`;
+      t+=hs.map(h=>`<th>${renderCell(h)}</th>`).join("")+`</tr></thead><tbody>`;
+      t+=rows.map(r=>`<tr>${r.map(c=>`<td>${renderCell(c)}</td>`).join("")}</tr>`).join("");
+      out+=t+`</tbody></table></div>`; continue;
+    }
+    buf.push(cur); i++;
   }
-  container.appendChild(d); scroll();
-  return d;
+  flush(); return out;
 }
+
+/* ── render a tool result (rows -> dark table, else JSON) ── */
+function resultHtml(name, result){
+  const r = result||{};
+  let html = "";
+  // exec_sql: show the SQL we ran with an amber rail
+  if((name==="exec_sql") && undefined!==r){ /* sql comes from args, handled by caller */ }
+  if(Array.isArray(r.columns) && r.columns.length && Array.isArray(r.rows)){
+    let t=`<table class="restable"><thead><tr>${r.columns.map(c=>`<th>${escapeHtml(String(c))}</th>`).join("")}</tr></thead><tbody>`;
+    t+=r.rows.map(row=>`<tr>${row.map(c=>c===null?`<td><span class="null">NULL</span></td>`:`<td>${escapeHtml(String(c))}</td>`).join("")}</tr>`).join("");
+    t+=`</tbody></table>`;
+    const n = r.row_sample_of ?? r.rows.length;
+    html += t + `<div class="resmeta">${n} 行${r.elapsed_ms!=null?" · "+r.elapsed_ms+" ms":""}${r.truncated?" · 已截断":""}</div>`;
+  } else {
+    html += `<pre class="tc-pre">${escapeHtml(JSON.stringify(r,null,2))}</pre>`;
+  }
+  return html;
+}
+
+function addTurn(role){
+  $("#empty")?.remove();
+  const t=document.createElement("div"); t.className="turn "+role;
+  const b=document.createElement("div"); b.className="bubble";
+  t.appendChild(b); stream.appendChild(t); scroll();
+  return b;
+}
+function scroll(){ stream.scrollTop=stream.scrollHeight; }
 
 async function send(){
-  const text = input.value.trim();
-  if((!text && !pendingImage) || busy) return;
-  busy = true; sendBtn.disabled = true;
-  input.value=""; input.style.height="auto";
+  const text=input.value.trim();
+  if((!text && !pendingImage)||busy) return;
+  busy=true; sendBtn.disabled=true; input.value=""; input.style.height="auto";
+  const img=pendingImage;
+  const content=img?[...(text?[{type:"text",text}]:[]),{type:"image_url",image_url:{url:img}}]:text;
+  history.push({role:"user",content}); clearThumb();
 
-  // Build the message content: a plain string, or an OpenAI-style content list
-  // when an image is attached (text part + image_url part).
-  const img = pendingImage;
-  const content = img
-    ? [ ...(text ? [{type:"text", text}] : []),
-        {type:"image_url", image_url:{url: img}} ]
-    : text;
-  history.push({role:"user", content});
-  clearThumb();
+  const ub=addTurn("user");
+  ub.innerHTML=(img?`<div class="bubble-images"><img class="bubble-image" src="${img}"></div>`:"")+(text?`<div class="content">${md(text)}</div>`:"");
 
-  const ub = addMsg("user");
-  ub.innerHTML = `<div class="bubble">${img ? `<img src="${img}" style="max-height:160px;border-radius:8px;display:block;margin-bottom:${text?'8px':'0'}">`:""}${text?md(text):""}</div>`;
+  const bb=addTurn("assistant");
+  const tools=document.createElement("div"); tools.className="tool-calls"; bb.appendChild(tools);
+  const prog=document.createElement("div"); prog.className="progress";
+  prog.innerHTML=`<div class="now"><span class="dots"><i></i><i></i><i></i></span> Agent 思考中…</div>`;
+  bb.appendChild(prog);
+  const contentEl=document.createElement("div"); contentEl.className="content"; bb.appendChild(contentEl);
 
-  const botBody = addMsg("bot");
-  const steps = document.createElement("div"); steps.className="steps"; botBody.appendChild(steps);
-  const bubble = document.createElement("div"); bubble.className="bubble"; bubble.style.display="none";
-  bubble.innerHTML = `<span style="color:#94a3b8">thinking…</span>`; botBody.appendChild(bubble); bubble.style.display="block";
+  const t0=performance.now(); let toolN=0; const open={};
+  function setNow(txt){ prog.querySelector(".now").innerHTML=`<span class="dots"><i></i><i></i><i></i></span> ${escapeHtml(txt)}`; }
 
   try{
-    const resp = await fetch("/api/agent",{
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({messages:history, connection:connSel.value})
-    });
-    const reader = resp.body.getReader();
-    const dec = new TextDecoder();
-    let buf="";
+    const resp=await fetch("/api/agent",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({messages:history,connection:connSel.value,dbname:dbSel.value})});
+    const reader=resp.body.getReader(); const dec=new TextDecoder(); let buf="";
     while(true){
-      const {value,done} = await reader.read();
-      if(done) break;
-      buf += dec.decode(value,{stream:true});
-      let idx;
+      const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true}); let idx;
       while((idx=buf.indexOf("\n\n"))>=0){
-        const line = buf.slice(0,idx).trim(); buf = buf.slice(idx+2);
+        const line=buf.slice(0,idx).trim(); buf=buf.slice(idx+2);
         if(!line.startsWith("data:")) continue;
-        const ev = JSON.parse(line.slice(5).trim());
-        if(ev.type==="tool_call" || ev.type==="tool_result"){ renderStep(steps, ev); }
-        else if(ev.type==="final"){
-          bubble.innerHTML = md(ev.content||"(empty answer)");
-          history.push({role:"assistant", content:ev.content||""}); scroll();
+        const ev=JSON.parse(line.slice(5).trim());
+        if(ev.type==="tool_call"){
+          toolN++; const n=toolN;
+          setNow(`${friendly(ev.name)}…`);
+          const d=document.createElement("details"); d.className="tc";
+          const argStr=ev.args&&Object.keys(ev.args).length?"…":"";
+          d.innerHTML=`<summary>#${n} <span class="tn">${friendly(ev.name)}</span>`+
+            `<span style="color:#909399">${escapeHtml(ev.name)}(${argStr})</span>`+
+            `<span class="ms run" data-ms>运行中</span></summary>`+
+            `<div class="tc-body"></div>`;
+          const body=d.querySelector(".tc-body");
+          // show SQL with amber rail if present, else args JSON
+          if(typeof ev.args?.sql==="string"){
+            body.innerHTML=`<div class="tc-lbl">SQL · ${escapeHtml(ev.args.conn_id||connSel.value)}</div><div class="sqlbox">${escapeHtml(ev.args.sql)}</div>`;
+          }else if(Array.isArray(ev.args?.queries)){
+            body.innerHTML=`<div class="tc-lbl">SQL ×${ev.args.queries.length}</div>`+ev.args.queries.map(q=>`<div class="sqlbox">${escapeHtml(q)}</div>`).join("");
+          }else{
+            body.innerHTML=`<div class="tc-lbl">args</div><pre class="tc-pre">${escapeHtml(JSON.stringify(ev.args||{},null,2))}</pre>`;
+          }
+          tools.appendChild(d);
+          open[n]={el:d,t:performance.now()}; open["_last"]=n;
+          scroll();
+        } else if(ev.type==="tool_result"){
+          const n=open["_last"]; const o=open[n];
+          if(o){
+            const ms=Math.round(performance.now()-o.t);
+            const msEl=o.el.querySelector("[data-ms]"); msEl.textContent=ms+"ms"; msEl.classList.remove("run");
+            const body=o.el.querySelector(".tc-body");
+            body.innerHTML+=`<div class="tc-lbl">result</div>${resultHtml(ev.name,ev.result)}`;
+          }
+        } else if(ev.type==="final"){
+          prog.remove();
+          contentEl.innerHTML=md(ev.content||"(空回复)");
+          const total=Math.round(performance.now()-t0);
+          const meta=document.createElement("div"); meta.className="meta";
+          meta.textContent=`⏱ ${total<1000?total+"ms":(total/1000).toFixed(1)+"s"}`+(toolN?` · 工具 × ${toolN}`:"");
+          bb.appendChild(meta);
+          history.push({role:"assistant",content:ev.content||""});
+          $("#export").disabled=false; scroll();
         } else if(ev.type==="error"){
-          bubble.innerHTML = `<span style="color:#b91c1c">⚠ ${escapeHtml(ev.error)}</span>`;
+          prog.remove();
+          contentEl.innerHTML=`<div class="md-text" style="color:#b91c1c">⚠ ${escapeHtml(ev.error)}</div>`;
         }
       }
     }
   }catch(e){
-    bubble.innerHTML = `<span style="color:#b91c1c">⚠ ${escapeHtml(String(e))}</span>`;
-  }finally{
-    busy=false; sendBtn.disabled=false; input.focus();
-  }
+    prog.remove(); contentEl.innerHTML=`<div class="md-text" style="color:#b91c1c">⚠ ${escapeHtml(String(e))}</div>`;
+  }finally{ busy=false; sendBtn.disabled=false; input.focus(); }
 }
 
-// ── connections ──
+/* ── connections + databases ── */
 async function loadConns(){
-  const r = await fetch("/api/connections"); const j = await r.json();
-  connSel.innerHTML="";
-  (j.connections||[]).forEach(c=>{
-    const o=document.createElement("option");
-    o.value=c.id; o.textContent=`${c.label} (${c.id})`;
-    connSel.appendChild(o);
-  });
+  try{
+    const j=await (await fetch("/api/connections")).json();
+    connSel.innerHTML="";
+    (j.connections||[]).forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.label;connSel.appendChild(o);});
+    loadDbs();
+  }catch(e){}
 }
+async function loadDbs(){
+  dbSel.innerHTML=`<option value="">(默认 db)</option>`;
+  const id=connSel.value; if(!id) return;
+  try{
+    const j=await (await fetch("/api/databases/"+id)).json();
+    (j.databases||[]).forEach(d=>{const o=document.createElement("option");o.value=d;o.textContent=d;dbSel.appendChild(o);});
+  }catch(e){}
+}
+connSel.onchange=loadDbs;
 
-// ── add-connection modal ──
-$("#addBtn").onclick=()=>$("#modalBg").style.display="flex";
-$("#m_cancel").onclick=()=>$("#modalBg").style.display="none";
-$("#m_save").onclick=async()=>{
-  const body={label:$("#m_label").value,driver:$("#m_driver").value,host:$("#m_host").value,
-    port:$("#m_port").value,user:$("#m_user").value,password:$("#m_pass").value,dbname:$("#m_db").value};
-  const r=await fetch("/api/connections",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-  if(!r.ok){const e=await r.json();alert(e.error||"failed");return;}
-  $("#modalBg").style.display="none";
-  ["m_label","m_host","m_port","m_user","m_pass","m_db"].forEach(i=>$("#"+i).value="");
-  await loadConns();
+/* ── image attach ── */
+function clearThumb(){pendingImage=null;$("#file").value="";$("#thumb").style.display="none";}
+$("#attach").onclick=()=>$("#file").click();
+$("#thumbX").onclick=clearThumb;
+$("#file").onchange=e=>{const f=e.target.files[0];if(!f)return;if(f.size>6*1024*1024){alert("图片太大（上限 ~6MB）");return;}
+  const r=new FileReader();r.onload=()=>{pendingImage=r.result;$("#thumbImg").src=r.result;$("#thumb").style.display="block";};r.readAsDataURL(f);};
+
+/* ── suggestions / toolbar ── */
+const sg=$("#suggest");
+SUGGESTIONS.forEach(s=>{const c=document.createElement("div");c.className="scard";
+  c.innerHTML=`<div class="ch"><span class="ci">${s.icon}</span><span class="cc">${s.cat}</span></div><div class="ct">${escapeHtml(s.text)}</div>`;
+  c.onclick=()=>{input.value=s.text;input.focus();};sg.appendChild(c);});
+$("#clear").onclick=()=>{history=[];stream.innerHTML="";location.reload();};
+$("#export").onclick=()=>{
+  const body=history.filter(h=>typeof h.content==="string"&&h.content.trim())
+    .map(h=>`<div class="t ${h.role}"><b>${h.role==="user"?"我":"Agent"}</b><div>${md(h.content)}</div></div>`).join("");
+  const doc=`<!doctype html><meta charset=utf-8><title>dblab-agent 对话</title>`+
+    `<style>body{font-family:system-ui,sans-serif;max-width:820px;margin:30px auto;padding:0 16px;color:#303133}`+
+    `.t{margin:14px 0;padding:12px 16px;border-radius:12px;border:1px solid #ebeef5}.user{background:#eef2ff}`+
+    `table{border-collapse:collapse}th,td{border:1px solid #e4e4e7;padding:6px 12px}th{background:#f4f4f5}`+
+    `pre{background:#0d1117;color:#e6edf3;padding:11px;border-radius:8px;overflow:auto}code{background:#f4f4f5;padding:1px 5px;border-radius:3px;color:#be185d}</style>`+body;
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([doc],{type:"text/html"}));
+  a.download="dblab-agent-conversation.html";a.click();
 };
-
-// ── image attach ──
-function clearThumb(){ pendingImage=null; $("#file").value=""; $("#thumb").style.display="none"; }
-$("#attach").onclick = () => $("#file").click();
-$("#thumbX").onclick = clearThumb;
-$("#file").onchange = e => {
-  const f = e.target.files[0]; if(!f) return;
-  if(f.size > 6*1024*1024){ alert("Image too large (max ~6 MB)."); return; }
-  const reader = new FileReader();
-  reader.onload = () => { pendingImage = reader.result; $("#thumbImg").src = reader.result; $("#thumb").style.display="block"; };
-  reader.readAsDataURL(f);
-};
-
-// ── examples + input ──
-const ex=$("#examples"); EXAMPLES.forEach(t=>{const b=document.createElement("button");b.textContent=t;
-  b.onclick=()=>{input.value=t;input.focus();};ex.appendChild(b);});
-input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(input.scrollHeight,160)+"px";});
+input.addEventListener("input",()=>{input.style.height="auto";input.style.height=Math.min(input.scrollHeight,180)+"px";});
 input.addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}});
 sendBtn.onclick=send;
 loadConns();
